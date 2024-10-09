@@ -8,17 +8,11 @@ const port = process.env.PORT || 5000;
 
 const app = express();
 const server = http.createServer(app);
-app.use(
-  cors({
-    origin: "http://localhost:3000", // Allow frontend origin
-    methods: ["GET", "POST"], // Allow these HTTP methods
-    credentials: true, // Allow credentials like cookies (if needed)
-  })
-);
+app.use(cors());
 
 const io = socketIO(server, {
   cors: {
-    origin: "http://localhost:3000", // Allow Socket.io connections from frontend
+    origin: "*", // Allow all origins
     methods: ["GET", "POST"], // Allow these HTTP methods
     credentials: true, // Allow credentials
   },
@@ -48,16 +42,29 @@ io.on("connection", (socket) => {
       text: `${user.name} has joined!`,
     });
 
+    io.to(user.room).emit("roomData", {
+      room: user.room,
+      users: getUsersInRoom(user.room),
+    });
+
   });
 
   socket.on("sendMessage", (message, callback) => {
     const user = getUser(socket.id);
     io.to(user.room).emit("message", { user: user.name, text: message });
+    io.to(user.room).emit("roomData", {
+      room: user.room,
+      users: getUsersInRoom(user.room),
+    });
     callback();
   });
 
   socket.on("disconnect", () => {
+    const user = removeUser(socket.id);
     console.log("User disconnected");
+    if(user){
+      io.to(user.room).emit("message", { user: "admin", text: `${user.name} has left.` });
+    }
   });
 });
 
